@@ -1,0 +1,270 @@
+
+
+--- File: README.md ---
+
+# Activity-Driven Revenue Analytics Project
+
+## Project Overview
+This project aims to explore raw data from different sources, transform it into activity metrics, and build a model to predict revenue data.
+
+## Project Structure
+│
+├── raw_data/
+│   └── global_tickets_wles_ops_data.csv
+├── processed_data/
+├── notebooks/
+│   └── 01_explore_global_tickets.ipynb
+├── scripts/
+├── models/
+├── docs/
+├── config/
+├── tests/
+├── results/
+├── .venv/
+├── .gitignore
+├── requirements.txt
+└── README.md
+
+## Setup and Installation
+1. Clone the repository
+2. Create a virtual environment:
+python -m venv .venv
+3. Activate the virtual environment:
+- Windows: `.venv\Scripts\activate`
+- macOS/Linux: `source .venv/bin/activate`
+4. Install required packages:
+pip install -r requirements.txt
+
+## Data Sources
+- Global tickets WLES operations data (CSV file)
+
+## Exploration and Analysis
+Initial data exploration is conducted in `notebooks/01_explore_global_tickets.ipynb`.
+
+## Version Control
+This project uses Git for version control. The `.gitignore` file is set up to exclude the virtual environment, large data files, and other non-essential files from version control.
+
+## Dependencies
+See `requirements.txt` for a list of Python dependencies.
+
+## Contributing
+
+
+## License
+
+
+## Contact
+Ihab Wahbi
+ihab.a.wahbi@gmail.com
+
+
+--- File: notebooks\01_explore_global_tickets.ipynb ---
+
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import pandas as pd\n",
+    "import numpy as np\n",
+    "import matplotlib.pyplot as plt\n",
+    "import seaborn as sns\n",
+    "\n",
+    "%matplotlib inline"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": ".venv",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "name": "python",
+   "version": "3.12.1"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2
+}
+
+
+--- File: raw_data\global_rpe_revenue.csv ---
+
+Shape: (22775, 5)
+
+Columns:
+SL Geounit (Code)
+Month Date
+SL Sub Business Line (Code)
+GL Account Category
+RPE Revenue
+
+Data Types:
+SL Geounit (Code)               object
+Month Date                      object
+SL Sub Business Line (Code)     object
+GL Account Category             object
+RPE Revenue                    float64
+
+First 5 rows:
+  SL Geounit (Code)           Month Date SL Sub Business Line (Code)   GL Account Category  RPE Revenue
+0               ABC  2012-01-01 00:00:00                        WLES       Product Revenue    320000.00
+1               ABC  2012-01-01 00:00:00                        WLES  Reimbursable Revenue     29937.45
+2               ABC  2012-01-01 00:00:00                         DHT       Service Revenue     64303.44
+3               ABC  2012-01-01 00:00:00                        LABR       Service Revenue    146844.00
+4               ABC  2012-01-01 00:00:00                        WLES       Service Revenue   4954878.04
+
+Description:
+        RPE Revenue
+count  2.277500e+04
+mean   1.448334e+06
+std    3.447773e+07
+min   -2.584344e+09
+25%    2.889730e+03
+50%    1.347806e+05
+75%    1.072404e+06
+max    2.600457e+09
+
+
+--- File: raw_data\global_tickets_wles_ops_data.csv ---
+
+Shape: (17913, 19)
+
+Columns:
+Sl Geounit (Code)
+Country Name
+Job Group code
+Job Type code
+Activity ID
+Booking Status
+Field Ticket ID
+Field Ticket Start Date
+Field Ticket End Date
+Well Name
+Rig Name
+Rig type
+Well type
+Well Operating Environment
+Billing Account
+Field Ticket Status
+Rig environment
+Well Geometry
+Field Ticket USD net value
+
+Data Types:
+Sl Geounit (Code)              object
+Country Name                   object
+Job Group code                 object
+Job Type code                  object
+Activity ID                    object
+Booking Status                 object
+Field Ticket ID                object
+Field Ticket Start Date        object
+Field Ticket End Date          object
+Well Name                      object
+Rig Name                       object
+Rig type                       object
+Well type                      object
+Well Operating Environment     object
+Billing Account                object
+Field Ticket Status            object
+Rig environment                object
+Well Geometry                  object
+Field Ticket USD net value    float64
+
+First 5 rows:
+  Sl Geounit (Code) Country Name Job Group code Job Type code      Activity ID          Booking Status         Field Ticket ID Field Ticket Start Date Field Ticket End Date      Well Name Rig Name  Rig type    Well type Well Operating Environment              Billing Account Field Ticket Status Rig environment Well Geometry  Field Ticket USD net value
+0               BRZ       Brazil           WLES     ES-OH-Ops  A.1002789.17.01  Operationally Complete  1002789.O0Z32.D1D69F8C     2022-09-04 03:00:00   2022-09-26 02:59:00  8-BUZ-59D-RJS      NaN       NaN          NaN                        NaN                          NaN      SubmittedForSO             NaN           NaN                   521905.20
+1               BRZ       Brazil           WLES     ES-CH-Ops  A.1002789.17.01  Operationally Complete  1002789.O0Z33.F8B6CC9F     2022-09-04 03:00:00   2022-09-26 02:59:00  8-BUZ-59D-RJS      NaN       NaN          NaN                        NaN                          NaN      SubmittedForSO             NaN           NaN                    59777.42
+2               ABC        Chile           WLES     ES-OH-Ops  A.1003553.65.01  Operationally Complete  1003553.V2C43.3A74A599     2022-08-26 04:00:00   2022-09-26 02:59:00      RCG ZG-1D      NaN       NaN          NaN                        NaN                    ENAP S.A.      SubmittedForSO             NaN           NaN                     7828.94
+3               ABC    Argentina           WLES     ES-CH-Ops  A.1005110.35.01  Operationally Complete  1005110.X6F48.C0D4BAD4     2022-09-24 03:00:00   2022-09-26 02:59:00  YPF.SC.EG-956  SAI-246  LAND RIG  Development                       LAND  MACACHA GUEMES 515 C1106BKK      SubmittedForSO            LAND           NaN                    17700.57
+4               BRZ       Brazil           WLES     ES-OH-Ops  A.1035019.03.02  Operationally Complete   1035019.U0G4.C14D5511     2022-09-24 03:00:00   2022-09-26 02:59:00     MINA 11 CD  OIL 122  LAND RIG          NaN                        NaN                 BRASKEM S.A.      SubmittedForSO            LAND           NaN                    18316.96
+
+Description:
+       Field Ticket USD net value
+count                1.791300e+04
+mean                 1.194899e+05
+std                  2.812131e+05
+min                  0.000000e+00
+25%                  1.500000e+04
+50%                  3.970162e+04
+75%                  1.086150e+05
+max                  7.270064e+06
+
+
+--- File: utils\create_codebase_summary.py ---
+
+import os
+import argparse
+import pandas as pd
+
+def create_codebase_file(directories, output_file, extensions=None, ignore_dirs=None, ignore_files=None, exclude_data=False):
+    if extensions is None:
+        extensions = ['.py', '.ipynb', '.sql', '.md', '.csv', '.xlsx']  # Including data file types
+    if ignore_dirs is None:
+        ignore_dirs = ['.git', '.venv', '__pycache__']
+    if ignore_files is None:
+        ignore_files = ['.gitignore', '.DS_Store']
+    
+    if exclude_data:
+        extensions = [ext for ext in extensions if ext not in ['.csv', '.xlsx']]
+        ignore_dirs.extend(['raw_data', 'processed_data'])
+
+    with open(output_file, 'w', encoding='utf-8') as outfile:
+        for directory in directories:
+            for dirpath, dirnames, filenames in os.walk(directory):
+                # Skip ignored directories
+                dirnames[:] = [d for d in dirnames if d not in ignore_dirs]
+                
+                for filename in filenames:
+                    if filename in ignore_files:
+                        continue
+                    
+                    if not any(filename.endswith(ext) for ext in extensions):
+                        continue
+                    
+                    filepath = os.path.join(dirpath, filename)
+                    relative_path = os.path.relpath(filepath, directory)
+                    
+                    outfile.write(f"\n\n--- File: {relative_path} ---\n\n")
+                    
+                    if filename.endswith(('.csv', '.xlsx')):
+                        outfile.write(summarize_data_file(filepath))
+                    else:
+                        try:
+                            with open(filepath, 'r', encoding='utf-8') as infile:
+                                outfile.write(infile.read())
+                        except UnicodeDecodeError:
+                            outfile.write(f"[Binary file: {relative_path}]\n")
+
+def summarize_data_file(filepath):
+    try:
+        if filepath.endswith('.csv'):
+            df = pd.read_csv(filepath)
+        elif filepath.endswith('.xlsx'):
+            df = pd.read_excel(filepath)
+        
+        summary = f"Shape: {df.shape}\n\n"
+        summary += "Columns:\n" + "\n".join(df.columns) + "\n\n"
+        summary += "Data Types:\n" + df.dtypes.to_string() + "\n\n"
+        summary += "First 5 rows:\n" + df.head().to_string() + "\n\n"
+        summary += "Description:\n" + df.describe().to_string() + "\n"
+        
+        return summary
+    except Exception as e:
+        return f"Error summarizing file: {str(e)}\n"
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Create a summary file of the codebase including data files.")
+    parser.add_argument('--dirs', nargs='+', default=['.'], help='Directories to process (default: current directory)')
+    parser.add_argument('--output', default='project_codebase_summary.txt', help='Output file path')
+    parser.add_argument('--exclude-data', action='store_true', help='Exclude data files (.csv, .xlsx) from the summary')
+    args = parser.parse_args()
+
+    create_codebase_file(args.dirs, args.output, exclude_data=args.exclude_data)
+    print(f"Codebase summary created at: {args.output}")
