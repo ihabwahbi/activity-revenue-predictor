@@ -63,17 +63,243 @@ ihab.a.wahbi@gmail.com
 {
  "cells": [
   {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Exploring All Geounit Revenue from Submitted Tickets\n",
+    "\n",
+    "This notebook analyzes All Geounits revenue from the tickets submited in the system month by month using the global tickets WLES operations data."
+   ]
+  },
+  {
    "cell_type": "code",
    "execution_count": null,
    "metadata": {},
    "outputs": [],
    "source": [
     "import pandas as pd\n",
-    "import numpy as np\n",
     "import matplotlib.pyplot as plt\n",
     "import seaborn as sns\n",
+    "import sys\n",
+    "import os\n",
+    "sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))\n",
     "\n",
-    "%matplotlib inline"
+    "%matplotlib inline\n",
+    "\n",
+    "# Set Seaborn style\n",
+    "sns.set_style(\"whitegrid\")  # You can choose any Seaborn style such as \"darkgrid\", \"white\", \"dark\", \"ticks\"\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Data Loading and Initial Exploration\n",
+    "\n",
+    "Let's load the data and take a look at its structure and content."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Load the data\n",
+    "df = pd.read_csv('../raw_data/global_tickets_wles_ops_data.csv')\n",
+    "\n",
+    "# Display the first few rows and data info\n",
+    "print(df.head())\n",
+    "print(\"\\nDataset Info:\")\n",
+    "df.info()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Exploring Job Type Codes\n",
+    "\n",
+    "In this section, we'll analyze the 'Job Type code' column to better understand the distribution of different job types in our dataset. This analysis will help us:\n",
+    "\n",
+    "1. Identify the unique job types present in the data\n",
+    "2. Determine the frequency of each job type\n",
+    "3. Calculate the percentage distribution of job types\n",
+    "4. Visualize the distribution using bar plots and pie charts\n",
+    "\n",
+    "This exploration will provide insights into the variety of jobs represented in our dataset and their relative prevalence, which could be crucial for understanding the nature of the work being performed and potentially identifying any imbalances or patterns in job type distribution."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Explore unique values in Job Type code column\n",
+    "\n",
+    "# Get unique Job Type codes\n",
+    "job_types = df['Job Type code'].unique()\n",
+    "\n",
+    "# Count occurrences of each Job Type code\n",
+    "job_type_counts = df['Job Type code'].value_counts()\n",
+    "\n",
+    "print(f\"Number of unique Job Type codes: {len(job_types)}\")\n",
+    "print(\"\\nUnique Job Type codes:\")\n",
+    "print(job_types)\n",
+    "\n",
+    "print(\"\\nJob Type code counts:\")\n",
+    "print(job_type_counts)\n",
+    "\n",
+    "# Calculate percentage of each Job Type code\n",
+    "job_type_percentages = (job_type_counts / len(df) * 100).round(2)\n",
+    "\n",
+    "print(\"\\nJob Type code percentages:\")\n",
+    "print(job_type_percentages)\n",
+    "\n",
+    "# Create a bar plot of Job Type code counts\n",
+    "plt.figure(figsize=(12, 6))\n",
+    "job_type_counts.plot(kind='bar')\n",
+    "plt.title('Count of Job Type Codes')\n",
+    "plt.xlabel('Job Type Code')\n",
+    "plt.ylabel('Count')\n",
+    "plt.xticks(rotation=45, ha='right')\n",
+    "plt.tight_layout()\n",
+    "plt.show()\n",
+    "\n",
+    "# Create a pie chart of Job Type code percentages\n",
+    "plt.figure(figsize=(10, 10))\n",
+    "plt.pie(job_type_percentages, labels=job_type_percentages.index, autopct='%1.1f%%')\n",
+    "plt.title('Distribution of Job Type Codes')\n",
+    "plt.axis('equal')\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Data Preprocessing\n",
+    "\n",
+    "Now, let's preprocess the data to prepare it for our analysis:\n",
+    "1. Convert date columns to datetime format\n",
+    "2. Extract month and year from the end date, applying the following rule:\n",
+    "   - If the date is from the 1st to the 25th (inclusive), use that month\n",
+    "   - If the date is from the 26th onwards, use the subsequent month\n",
+    "3. Group the data by Geounit and Month-Year, summing the revenue"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Data Preprocessing\n",
+    "\n",
+    "# Import the preprocessing function\n",
+    "import importlib\n",
+    "import utils.revenue_data_preprocessing as rdp\n",
+    "importlib.reload(rdp)\n",
+    "print(dir(rdp))\n",
+    "\n",
+    "# Apply the preprocessing function\n",
+    "df = rdp.preprocess_tickets_data(df)\n",
+    "\n",
+    "# 3. Group the data by Geounit and Month-Year, summing the revenue\n",
+    "grouped_data = df.groupby(['Sl Geounit (Code)', pd.Grouper(key='Adjusted Date', freq='MS')])['Field Ticket USD net value'].sum().reset_index()\n",
+    "\n",
+    "# Rename columns for clarity\n",
+    "grouped_data.columns = ['Geounit', 'Date', 'Revenue']\n",
+    "\n",
+    "# Sort the data by Geounit and Date\n",
+    "grouped_data = grouped_data.sort_values(['Geounit', 'Date'])\n",
+    "\n",
+    "# Display the first few rows of the processed data\n",
+    "print(grouped_data.head(10))\n",
+    "\n",
+    "# Display summary statistics\n",
+    "print(\"\\nSummary Statistics:\")\n",
+    "print(grouped_data.describe())\n",
+    "\n",
+    "# Check for any missing values\n",
+    "print(\"\\nMissing Values:\")\n",
+    "print(grouped_data.isnull().sum())"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Visualization: Monthly Revenue by Geounit\n",
+    "\n",
+    "Let's create a line plot to visualize the monthly revenue trends for each Geounit."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import ipywidgets as widgets\n",
+    "from ipywidgets import interact\n",
+    "\n",
+    "# Function to plot revenue over time for selected geounits\n",
+    "def plot_revenue_over_time(selected_geounits):\n",
+    "    plt.figure(figsize=(15, 8))\n",
+    "    \n",
+    "    for geounit in selected_geounits:\n",
+    "        data = grouped_data[grouped_data['Geounit'] == geounit]\n",
+    "        plt.plot(data['Date'], data['Revenue'], label=geounit)\n",
+    "    \n",
+    "    plt.title('Revenue Over Time by Geounit', fontsize=16)\n",
+    "    plt.xlabel('Date', fontsize=12)\n",
+    "    plt.ylabel('Revenue (USD)', fontsize=12)\n",
+    "    plt.legend(title='Geounit', bbox_to_anchor=(1.05, 1), loc='upper left')\n",
+    "    plt.grid(True, linestyle='--', alpha=0.7)\n",
+    "    plt.xticks(rotation=45)\n",
+    "    plt.tight_layout()\n",
+    "    plt.show()\n",
+    "\n",
+    "# Get unique geounits\n",
+    "geounits = sorted(grouped_data['Geounit'].unique())\n",
+    "\n",
+    "# Create multi-select widget\n",
+    "geounit_selector = widgets.SelectMultiple(\n",
+    "    options=geounits,\n",
+    "    value=[geounits[0]],  # Default to first geounit\n",
+    "    description='Geounits:',\n",
+    "    disabled=False\n",
+    ")\n",
+    "\n",
+    "# Create interactive plot\n",
+    "interact(plot_revenue_over_time, selected_geounits=geounit_selector)\n",
+    "\n",
+    "# Display summary statistics for all geounits\n",
+    "print(\"Summary Statistics by Geounit:\")\n",
+    "summary_stats = grouped_data.groupby('Geounit')['Revenue'].agg(['mean', 'median', 'min', 'max']).round(2)\n",
+    "summary_stats.columns = ['Mean Revenue', 'Median Revenue', 'Min Revenue', 'Max Revenue']\n",
+    "display(summary_stats)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Analysis\n",
+    "\n",
+    "From the plot above, we can observe the following:\n",
+    "\n",
+    "1. Different Geounits have varying levels of revenue.\n",
+    "2. Some Geounits show more volatility in their monthly revenue than others.\n",
+    "3. There might be seasonal patterns or trends for certain Geounits.\n",
+    "\n",
+    "To further analyze this data, we could:\n",
+    "- Calculate and compare the average monthly revenue for each Geounit\n",
+    "- Identify the top-performing Geounits\n",
+    "- Analyze the revenue trends over time for specific Geounits of interest\n",
+    "- Investigate any correlation between revenue and other variables in the dataset"
    ]
   }
  ],
@@ -84,7 +310,15 @@ ihab.a.wahbi@gmail.com
    "name": "python3"
   },
   "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
    "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
    "version": "3.12.1"
   }
  },
@@ -93,42 +327,459 @@ ihab.a.wahbi@gmail.com
 }
 
 
---- File: raw_data\global_rpe_revenue.csv ---
+--- File: notebooks\02_explore_rpe_revenue.ipynb ---
 
-Shape: (22775, 5)
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# 02_explore_rpe_revenue.ipynb\n",
+    "\n",
+    "import pandas as pd\n",
+    "import matplotlib.pyplot as plt\n",
+    "import seaborn as sns\n",
+    "import sys\n",
+    "import os\n",
+    "sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))\n",
+    "import importlib\n",
+    "import utils.revenue_data_preprocessing as rdp\n",
+    "\n",
+    "# Reload the module to ensure we have the latest version\n",
+    "importlib.reload(rdp)\n",
+    "\n",
+    "# Load the data\n",
+    "rpe_revenue_df = pd.read_csv('../raw_data/global_rpe_revenue.csv')\n",
+    "\n",
+    "# Display basic information about the dataset\n",
+    "print(\"Original Dataset Info:\")\n",
+    "print(rpe_revenue_df.info())\n",
+    "\n",
+    "# Apply the preprocessing function (now including WLES filter)\n",
+    "rpe_revenue_df = rdp.preprocess_rpe_data(rpe_revenue_df)\n",
+    "\n",
+    "print(\"\\nPreprocessed Dataset Info (WLES only):\")\n",
+    "print(rpe_revenue_df.info())\n",
+    "\n",
+    "# Group by Geounit and Month, summing the RPE Revenue\n",
+    "monthly_revenue = rpe_revenue_df.groupby(['SL Geounit (Code)', pd.Grouper(key='Month Date', freq='M')])['RPE Revenue'].sum().reset_index()\n",
+    "\n",
+    "# Display the first few rows of the grouped data\n",
+    "print(\"\\nFirst few rows of grouped data:\")\n",
+    "print(monthly_revenue.head())\n",
+    "\n",
+    "# Pivot the data for easier plotting\n",
+    "pivot_revenue = monthly_revenue.pivot(index='Month Date', columns='SL Geounit (Code)', values='RPE Revenue')\n",
+    "\n",
+    "# Plot the monthly revenue for each Geounit\n",
+    "plt.figure(figsize=(15, 8))\n",
+    "for geounit in pivot_revenue.columns:\n",
+    "    plt.plot(pivot_revenue.index, pivot_revenue[geounit], label=geounit)\n",
+    "\n",
+    "plt.title('Monthly WLES RPE Revenue by Geounit')\n",
+    "plt.xlabel('Date')\n",
+    "plt.ylabel('RPE Revenue')\n",
+    "plt.legend(title='Geounit', bbox_to_anchor=(1.05, 1), loc='upper left')\n",
+    "plt.tight_layout()\n",
+    "plt.show()\n",
+    "\n",
+    "# Calculate and display total revenue by Geounit\n",
+    "total_revenue_by_geounit = monthly_revenue.groupby('SL Geounit (Code)')['RPE Revenue'].sum().sort_values(ascending=False)\n",
+    "print(\"\\nTotal WLES Revenue by Geounit:\")\n",
+    "print(total_revenue_by_geounit)\n",
+    "\n",
+    "# Display summary statistics\n",
+    "print(\"\\nSummary Statistics:\")\n",
+    "print(monthly_revenue.describe())\n",
+    "\n",
+    "# Check for any missing values\n",
+    "print(\"\\nMissing Values:\")\n",
+    "print(monthly_revenue.isnull().sum())\n",
+    "\n",
+    "# Further analysis can be added here based on specific requirements and insights gained"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": ".venv",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.12.1"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2
+}
+
+
+--- File: notebooks\03_compare_revenue_sources.ipynb ---
+
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# 03_compare_revenue_sources.ipynb\n",
+    "\n",
+    "import pandas as pd\n",
+    "import matplotlib.pyplot as plt\n",
+    "import seaborn as sns\n",
+    "import sys\n",
+    "import os\n",
+    "sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))\n",
+    "import ipywidgets as widgets\n",
+    "from ipywidgets import interact\n",
+    "import importlib\n",
+    "import utils.revenue_data_preprocessing as rdp\n",
+    "\n",
+    "# Reload the module to ensure we have the latest version\n",
+    "importlib.reload(rdp)\n",
+    "\n",
+    "# Load and preprocess the data\n",
+    "tickets_df = pd.read_csv('../raw_data/global_tickets_wles_ops_data.csv')\n",
+    "rpe_revenue_df = pd.read_csv('../raw_data/global_rpe_revenue.csv')\n",
+    "\n",
+    "tickets_df = rdp.preprocess_tickets_data(tickets_df)\n",
+    "rpe_revenue_df = rdp.preprocess_rpe_data(rpe_revenue_df)  # This now includes only WLES data\n",
+    "\n",
+    "# Prepare monthly revenue data for tickets\n",
+    "tickets_monthly = tickets_df.groupby(['Sl Geounit (Code)', pd.Grouper(key='Adjusted Date', freq='MS')])['Field Ticket USD net value'].sum().reset_index()\n",
+    "tickets_monthly.columns = ['Geounit', 'Date', 'Tickets Revenue']\n",
+    "\n",
+    "# Prepare monthly revenue data for RPE (WLES only)\n",
+    "rpe_monthly = rpe_revenue_df.groupby(['SL Geounit (Code)', pd.Grouper(key='Month Date', freq='MS')])['RPE Revenue'].sum().reset_index()\n",
+    "rpe_monthly.columns = ['Geounit', 'Date', 'RPE Revenue']\n",
+    "\n",
+    "# Merge the two datasets\n",
+    "merged_data = pd.merge(tickets_monthly, rpe_monthly, on=['Geounit', 'Date'], how='outer').fillna(0)\n",
+    "\n",
+    "# Filter data from October 2022 onwards\n",
+    "start_date = pd.to_datetime('2022-10-01')\n",
+    "merged_data = merged_data[merged_data['Date'] >= start_date]\n",
+    "\n",
+    "# Get unique geounits\n",
+    "geounits = sorted(merged_data['Geounit'].unique())\n",
+    "\n",
+    "# Create the plotting function\n",
+    "def plot_revenue_comparison(geounit):\n",
+    "    data = merged_data[merged_data['Geounit'] == geounit]\n",
+    "    \n",
+    "    plt.figure(figsize=(15, 8))\n",
+    "    plt.plot(data['Date'], data['Tickets Revenue'], label='Tickets Revenue')\n",
+    "    plt.plot(data['Date'], data['RPE Revenue'], label='RPE Service Revenue (WLES)')\n",
+    "    \n",
+    "    plt.title(f'Monthly Revenue Comparison for Geounit: {geounit} (from Oct 2022)')\n",
+    "    plt.xlabel('Date')\n",
+    "    plt.ylabel('Revenue (USD)')\n",
+    "    plt.legend()\n",
+    "    plt.grid(True)\n",
+    "    \n",
+    "    # Rotate x-axis labels for better readability\n",
+    "    plt.xticks(rotation=45)\n",
+    "    \n",
+    "    plt.tight_layout()\n",
+    "    plt.show()\n",
+    "    \n",
+    "    # Print summary statistics\n",
+    "    print(f\"\\nSummary Statistics for {geounit} (from Oct 2022):\")\n",
+    "    print(data[['Tickets Revenue', 'RPE Revenue']].describe())\n",
+    "    \n",
+    "    # Calculate and print total revenue from each source\n",
+    "    total_tickets = data['Tickets Revenue'].sum()\n",
+    "    total_rpe = data['RPE Revenue'].sum()\n",
+    "    print(f\"\\nTotal Tickets Revenue: ${total_tickets:,.2f}\")\n",
+    "    print(f\"Total RPE Service Revenue (WLES): ${total_rpe:,.2f}\")\n",
+    "    print(f\"Difference (RPE WLES Service Revenue - Tickets): ${total_rpe - total_tickets:,.2f}\")\n",
+    "    \n",
+    "    # Calculate and print correlation\n",
+    "    correlation = data['Tickets Revenue'].corr(data['RPE Revenue'])\n",
+    "    print(f\"\\nCorrelation between Tickets and RPE Service Revenue: {correlation:.4f}\")\n",
+    "    \n",
+    "# Create the interactive widget\n",
+    "interact(plot_revenue_comparison, geounit=widgets.Dropdown(options=geounits, description='Geounit:'))\n",
+    "\n",
+    "# Function to compare total revenue across all geounits\n",
+    "def compare_total_revenue():\n",
+    "    total_comparison = merged_data.groupby('Geounit').agg({\n",
+    "        'Tickets Revenue': 'sum',\n",
+    "        'RPE Revenue': 'sum'\n",
+    "    }).reset_index()\n",
+    "    \n",
+    "    total_comparison['Difference'] = total_comparison['RPE Revenue'] - total_comparison['Tickets Revenue']\n",
+    "    total_comparison['Difference %'] = (total_comparison['Difference'] / total_comparison['Tickets Revenue']) * 100\n",
+    "    total_comparison = total_comparison.sort_values('Difference', ascending=False)\n",
+    "    \n",
+    "    print(\"Total Revenue Comparison Across All Geounits (from Oct 2022):\")\n",
+    "    print(total_comparison)\n",
+    "    \n",
+    "    # Plotting\n",
+    "    plt.figure(figsize=(15, 10))\n",
+    "    plt.scatter(total_comparison['Tickets Revenue'], total_comparison['RPE Revenue'])\n",
+    "    \n",
+    "    for i, row in total_comparison.iterrows():\n",
+    "        plt.annotate(row['Geounit'], \n",
+    "                     (row['Tickets Revenue'], row['RPE Revenue']),\n",
+    "                     xytext=(5, 5), textcoords='offset points')\n",
+    "    \n",
+    "    plt.xlabel('Total Tickets Revenue')\n",
+    "    plt.ylabel('Total RPE Service Revenue (WLES)')\n",
+    "    plt.title('Comparison of Total Revenue: Tickets vs RPE Service Revenue (WLES) from Oct 2022')\n",
+    "    \n",
+    "    \n",
+    "    max_val = max(total_comparison['Tickets Revenue'].max(), total_comparison['RPE Revenue'].max())\n",
+    "    plt.plot([0, max_val], [0, max_val], 'r--', label='Equal Revenue Line')\n",
+    "    \n",
+    "    plt.legend()\n",
+    "    plt.grid(True)\n",
+    "    plt.tight_layout()\n",
+    "    plt.show()\n",
+    "    \n",
+    "    # Calculate overall correlation\n",
+    "    overall_correlation = merged_data['Tickets Revenue'].corr(merged_data['RPE Revenue'])\n",
+    "    print(f\"\\nOverall Correlation between Tickets and RPE Service Revenue: {overall_correlation:.4f}\")\n",
+    "\n",
+    "# Run the total revenue comparison\n",
+    "compare_total_revenue()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import pandas as pd\n",
+    "import re\n",
+    "\n",
+    "# Assuming tickets_df and rpe_revenue_df are already loaded and preprocessed\n",
+    "\n",
+    "# Extract unique ticket numbers/IDs from both datasets\n",
+    "rpe_ticket_numbers = set(rpe_revenue_df['Field Ticket Number'].dropna().unique())\n",
+    "tickets_ids = set(tickets_df['Field Ticket ID'].dropna().unique())\n",
+    "\n",
+    "# Function to extract the base ticket number (before the second dot)\n",
+    "def extract_base_ticket(ticket):\n",
+    "    parts = str(ticket).split('.')\n",
+    "    return '.'.join(parts[:2]) if len(parts) > 1 else ticket\n",
+    "\n",
+    "# Create dictionaries with base ticket numbers as keys\n",
+    "rpe_base_tickets = {extract_base_ticket(tn): tn for tn in rpe_ticket_numbers}\n",
+    "tickets_base_ids = {extract_base_ticket(tid): tid for tid in tickets_ids}\n",
+    "\n",
+    "# Find ticket numbers in RPE data that don't exist in tickets data\n",
+    "rpe_not_in_tickets = [tn for base, tn in rpe_base_tickets.items() if base not in tickets_base_ids]\n",
+    "\n",
+    "# Find ticket IDs in tickets data that don't exist in RPE data\n",
+    "tickets_not_in_rpe = [tid for base, tid in tickets_base_ids.items() if base not in rpe_base_tickets]\n",
+    "\n",
+    "# Print results\n",
+    "print(\"Ticket numbers in RPE data that don't exist in tickets data:\")\n",
+    "print(rpe_not_in_tickets[:10])  # Print first 10 for brevity\n",
+    "print(f\"Total count: {len(rpe_not_in_tickets)}\")\n",
+    "\n",
+    "print(\"\\nTicket IDs in tickets data that don't exist in RPE data:\")\n",
+    "print(tickets_not_in_rpe[:10])  # Print first 10 for brevity\n",
+    "print(f\"Total count: {len(tickets_not_in_rpe)}\")\n",
+    "\n",
+    "# Optional: Save results to CSV files for further analysis\n",
+    "pd.Series(rpe_not_in_tickets).to_csv('../results/rpe_tickets_not_in_field_data.csv', index=False)\n",
+    "pd.Series(tickets_not_in_rpe).to_csv('../results/field_tickets_not_in_rpe_data.csv', index=False)\n",
+    "\n",
+    "# Verification step\n",
+    "print(\"\\nVerification:\")\n",
+    "test_rpe_ticket = \"1050836.S5V13\"\n",
+    "test_field_ticket = \"1050836.S5V9.9FC0EF33\"\n",
+    "print(f\"RPE ticket {test_rpe_ticket} base: {extract_base_ticket(test_rpe_ticket)}\")\n",
+    "print(f\"Field ticket {test_field_ticket} base: {extract_base_ticket(test_field_ticket)}\")\n",
+    "print(f\"RPE ticket {test_rpe_ticket} {'matches' if extract_base_ticket(test_rpe_ticket) == extract_base_ticket(test_field_ticket) else 'does not match'} field ticket {test_field_ticket}\")\n",
+    "\n",
+    "# Additional verification with more examples\n",
+    "print(\"\\nAdditional Verifications:\")\n",
+    "test_cases = [\n",
+    "    (\"1234567.ABC12\", \"1234567.ABC12.XYZ789\"),\n",
+    "    (\"9876543.DEF45\", \"9876543.DEF45.123456\"),\n",
+    "    (\"1122334.GHI67.extra\", \"1122334.GHI67.something_else\")\n",
+    "]\n",
+    "\n",
+    "for rpe, field in test_cases:\n",
+    "    print(f\"RPE: {rpe}, Field: {field}, Match: {extract_base_ticket(rpe) == extract_base_ticket(field)}\")"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": ".venv",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.12.1"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2
+}
+
+
+--- File: raw_data\apg_activityid_oeid_well.csv ---
+
+Shape: (7332, 3)
 
 Columns:
-SL Geounit (Code)
+Activity ID
+OE Event ID
+Well Name
+
+Data Types:
+Activity ID    object
+OE Event ID    object
+Well Name      object
+
+First 5 rows:
+       Activity ID               OE Event ID                  Well Name
+0  A.1011289.01.01  A.1011289.01.01_4D2B22AE                 ​D-WI1 ST1
+1  A.1011289.01.01  A.1011289.01.01_4D2B22AE                     ​D-WI3
+2  A.1011289.01.01  A.1011289.01.01_4D2B22AE                 ​D-WP1 ST1
+3  A.1024839.07.01  A.1024839.07.01_2786BED2  665C-12  API 04-030-67518
+4  A.1024839.09.02  A.1024839.09.02_6E7BDACA              A20 - Slot 12
+
+Description:
+            Activity ID               OE Event ID Well Name
+count              7332                      7332      4654
+unique             1286                      2727      2642
+top     A.1033318.03.02  A.1033318.03.02_2C46ED8D   Well #2
+freq                351                       351        11
+
+
+--- File: raw_data\apg_oeid_operating_time.csv ---
+
+Shape: (1752, 7)
+
+Columns:
+Sl Geounit (Code)
+Activity ID
+Journal Ops Event ID
+Journal Activity
+Journal Activity start time
+Journal Activity end time
+Journal Activity duration, hrs
+
+Data Types:
+Sl Geounit (Code)                 object
+Activity ID                       object
+Journal Ops Event ID              object
+Journal Activity                  object
+Journal Activity start time       object
+Journal Activity end time         object
+Journal Activity duration, hrs     int64
+
+First 5 rows:
+  Sl Geounit (Code)      Activity ID      Journal Ops Event ID Journal Activity Journal Activity start time Journal Activity end time  Journal Activity duration, hrs
+0               APG  A.1001189.02.05  A.1001189.02.05_4A06585C   Operating time         2021-12-27 07:32:00       2021-12-29 05:32:00                              46
+1               APG  A.1001189.02.05  A.1001189.02.05_4B7829D5   Operating time         2021-12-26 19:49:00       2021-12-27 06:00:00                              10
+2               APG  A.1001189.02.05  A.1001189.02.05_AD4D3182   Operating time         2021-12-26 10:28:00       2021-12-26 17:48:00                               7
+3               APG  A.1001189.02.09  A.1001189.02.09_81424B4B   Operating time         2022-05-06 23:45:00       2022-05-08 01:30:00                              26
+4               APG  A.1001189.02.09  A.1001189.02.09_92A706BA   Operating time         2022-05-04 11:30:00       2022-05-06 20:35:00                              57
+
+Description:
+       Journal Activity duration, hrs
+count                     1752.000000
+mean                         8.034247
+std                         47.575027
+min                          0.000000
+25%                          2.000000
+50%                          4.000000
+75%                          8.000000
+max                       1421.000000
+
+
+--- File: raw_data\global_rpe_revenue.csv ---
+
+Shape: (18689, 17)
+
+Columns:
 Month Date
+SL Geounit (Code)
+SL Sub Geounit (Code)
 SL Sub Business Line (Code)
 GL Account Category
 RPE Revenue
+Rig Name
+Well Name
+Customer Account Name
+Well Operating Environment
+Rig Type
+Well Type
+Field Ticket Number
+Job Group
+Job Type
+SAP Plant Code
+Ops Activity Number
 
 Data Types:
-SL Geounit (Code)               object
 Month Date                      object
+SL Geounit (Code)               object
+SL Sub Geounit (Code)           object
 SL Sub Business Line (Code)     object
 GL Account Category             object
 RPE Revenue                    float64
+Rig Name                        object
+Well Name                       object
+Customer Account Name           object
+Well Operating Environment      object
+Rig Type                        object
+Well Type                       object
+Field Ticket Number             object
+Job Group                       object
+Job Type                        object
+SAP Plant Code                   int64
+Ops Activity Number             object
 
 First 5 rows:
-  SL Geounit (Code)           Month Date SL Sub Business Line (Code)   GL Account Category  RPE Revenue
-0               ABC  2012-01-01 00:00:00                        WLES       Product Revenue    320000.00
-1               ABC  2012-01-01 00:00:00                        WLES  Reimbursable Revenue     29937.45
-2               ABC  2012-01-01 00:00:00                         DHT       Service Revenue     64303.44
-3               ABC  2012-01-01 00:00:00                        LABR       Service Revenue    146844.00
-4               ABC  2012-01-01 00:00:00                        WLES       Service Revenue   4954878.04
+            Month Date SL Geounit (Code) SL Sub Geounit (Code) SL Sub Business Line (Code) GL Account Category  RPE Revenue  Rig Name           Well Name                                               Customer Account Name Well Operating Environment  Rig Type Well Type Field Ticket Number Job Group   Job Type  SAP Plant Code Ops Activity Number
+0  2022-10-01 00:00:00               ABC                   ARG                        WLES     Service Revenue     93452.97  DLS-4163   YPF.NQ.RN-2079(D)  YPF, PESA, POSA AREA RIO NEUQUEN PORCION NEUQUEN UNION TRANSITORIA                       LAND  LAND RIG       NaN       1004903.U2J50      WLES  ES-OH-Ops            3401     A.1004903.06.10
+1  2022-10-01 00:00:00               ABC                   ARG                        WLES     Service Revenue     73922.02  DLS-4163   YPF.NQ.RN-2080(D)  YPF, PESA, POSA AREA RIO NEUQUEN PORCION NEUQUEN UNION TRANSITORIA                       LAND  LAND RIG       NaN       1004903.U2J48      WLES  ES-OH-Ops            3401     A.1004903.06.12
+2  2022-10-01 00:00:00               ABC                   ARG                        WLES     Service Revenue     10438.59  DLS-4166  YPF.NQ.LACH-471(H)                                    YPF SA PETRONAS EYP ARGENTINA SA                       LAND  LAND RIG       NaN       1005763.W6T58      WLES  ES-OH-Ops            3401     A.1005763.05.27
+3  2022-10-01 00:00:00               ABC                   ARG                        WLES     Service Revenue     15734.10  DLS-4166  YPF.NQ.LACH-629(H)                                    YPF SA PETRONAS EYP ARGENTINA SA                       LAND  LAND RIG       NaN       1005763.W6T59      WLES  ES-OH-Ops            3401     A.1005763.05.27
+4  2022-10-01 00:00:00               ABC                   ARG                        WLES     Service Revenue     15397.72  DLS-4166  YPF.NQ.LACH-630(H)                                    YPF SA PETRONAS EYP ARGENTINA SA                       LAND  LAND RIG       NaN       1005763.W6T60      WLES  ES-OH-Ops            3401     A.1005763.05.27
 
 Description:
-        RPE Revenue
-count  2.277500e+04
-mean   1.448334e+06
-std    3.447773e+07
-min   -2.584344e+09
-25%    2.889730e+03
-50%    1.347806e+05
-75%    1.072404e+06
-max    2.600457e+09
+        RPE Revenue  SAP Plant Code
+count  1.868900e+04     18689.00000
+mean   9.644403e+04      3158.77757
+std    2.596045e+05       652.98084
+min   -1.868000e+06      1004.00000
+25%    8.524720e+03      3041.00000
+50%    2.750000e+04      3140.00000
+75%    8.178611e+04      3614.00000
+max    7.270064e+06      4383.00000
 
 
 --- File: raw_data\global_tickets_wles_ops_data.csv ---
@@ -195,6 +846,58 @@ min                  0.000000e+00
 50%                  3.970162e+04
 75%                  1.086150e+05
 max                  7.270064e+06
+
+
+--- File: results\field_tickets_not_in_rpe_data.csv ---
+
+Shape: (2923, 1)
+
+Columns:
+0
+
+Data Types:
+0    object
+
+First 5 rows:
+                         0
+0      1000454.30.3330306E
+1      1009330.16.60493080
+2    1028065.M5W6.968C9E1B
+3  1008647.F0Q178.FC2AAC08
+4  1024839.U1C129.623851EC
+
+Description:
+                              0
+count                      2923
+unique                     2923
+top     1025107.J8H484.3A015632
+freq                          1
+
+
+--- File: results\rpe_tickets_not_in_field_data.csv ---
+
+Shape: (1821, 1)
+
+Columns:
+0
+
+Data Types:
+0    object
+
+First 5 rows:
+               0
+0  1050836.S5V13
+1  1007437.M1D44
+2  1030987.C2L17
+3  1022243.B5W28
+4  1022619.W6X56
+
+Description:
+                   0
+count           1821
+unique          1821
+top     1038571.Y8Q5
+freq               1
 
 
 --- File: utils\create_codebase_summary.py ---
@@ -268,3 +971,64 @@ if __name__ == "__main__":
 
     create_codebase_file(args.dirs, args.output, exclude_data=args.exclude_data)
     print(f"Codebase summary created at: {args.output}")
+
+--- File: utils\revenue_data_preprocessing.py ---
+
+# utils/revenue_data_preprocessing.py
+
+import pandas as pd
+
+def preprocess_tickets_data(df):
+    """
+    Preprocess the tickets data.
+    
+    Args:
+    df (pd.DataFrame): Raw tickets dataframe
+    
+    Returns:
+    pd.DataFrame: Preprocessed tickets dataframe
+    """
+    df = df.copy()
+    df['Field Ticket Start Date'] = pd.to_datetime(df['Field Ticket Start Date'])
+    df['Field Ticket End Date'] = pd.to_datetime(df['Field Ticket End Date'])
+    df['Adjusted Date'] = df['Field Ticket End Date'].apply(adjust_month)
+    return df
+
+def preprocess_rpe_data(df):
+    """
+    Preprocess the RPE revenue data.
+    Filters the data to include only WLES (Wireline Services) business line
+    and Service Revenue GL Account Category.
+    
+    Args:
+    df (pd.DataFrame): Raw RPE revenue dataframe
+    
+    Returns:
+    pd.DataFrame: Preprocessed RPE revenue dataframe for WLES and Service Revenue only
+    """
+    df = df.copy()
+    df['Month Date'] = pd.to_datetime(df['Month Date'])
+    
+    # Filter for WLES business line and Service Revenue GL Account Category
+    df_filtered = df[(df['SL Sub Business Line (Code)'] == 'WLES') & 
+                     (df['GL Account Category'] == 'Service Revenue')]
+    
+    return df_filtered
+
+def adjust_month(date):
+    """
+    Adjust the month based on the specified criteria.
+    Dates from the 26th onwards fall under the subsequent month.
+    This function is used only for tickets data.
+    
+    Args:
+    date (pd.Timestamp): Date to adjust
+    
+    Returns:
+    pd.Timestamp: Adjusted date
+    """
+    if date.day <= 25:
+        return date.replace(day=1)
+    else:
+        next_month = date + pd.DateOffset(months=1)
+        return next_month.replace(day=1)
