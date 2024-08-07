@@ -648,42 +648,109 @@ ihab.a.wahbi@gmail.com
 }
 
 
---- File: raw_data\apg_activityid_oeid_well.csv ---
+--- File: notebooks\04_explore_tickets_detailed_grouping.ipynb ---
 
-Shape: (7332, 3)
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import pandas as pd\n",
+    "import sys\n",
+    "import os\n",
+    "sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))\n",
+    "from utils.revenue_data_preprocessing import preprocess_tickets_data\n",
+    "\n",
+    "# Load and preprocess the data\n",
+    "df = pd.read_csv('../raw_data/global_tickets_wles_ops_data.csv')\n",
+    "df = preprocess_tickets_data(df)\n",
+    "\n",
+    "# Group by all columns except Well Name, and calculate revenue sum and well count\n",
+    "grouped_data = df.groupby([\n",
+    "    'Adjusted Date', 'Sl Geounit (Code)', 'Country Name', 'Activity ID', 'Rig Name',\n",
+    "    'Rig type', 'Well type', 'Well Operating Environment', 'Billing Account', 'Rig environment'\n",
+    "]).agg({\n",
+    "    'Field Ticket USD net value': 'sum',\n",
+    "    'Well Name': 'nunique'\n",
+    "}).reset_index()\n",
+    "\n",
+    "# Rename the 'Well Name' column to 'Well_Count'\n",
+    "grouped_data = grouped_data.rename(columns={'Well Name': 'Well_Count'})\n",
+    "\n",
+    "# Display the first few rows of the grouped dataset\n",
+    "print(\"First few rows of the Grouped Data (with Well Count):\")\n",
+    "print(grouped_data.head(10))\n",
+    "\n",
+    "# Display basic information about the dataset\n",
+    "print(\"\\nDataset Info:\")\n",
+    "print(grouped_data.info())\n",
+    "\n",
+    "# Check for duplicate Activity IDs\n",
+    "duplicate_activities = grouped_data[grouped_data.duplicated(subset=['Activity ID'], keep=False)]\n",
+    "\n",
+    "print(\"\\nNumber of rows with duplicate Activity IDs:\", len(duplicate_activities))\n",
+    "\n",
+    "if len(duplicate_activities) > 0:\n",
+    "    print(\"\\nExample of duplicate Activity IDs:\")\n",
+    "    print(duplicate_activities.head(10))\n",
+    "\n",
+    "    # Group by Activity ID and show the count of duplicates\n",
+    "    activity_counts = grouped_data['Activity ID'].value_counts()\n",
+    "    print(\"\\nTop 10 Activity IDs by occurrence count:\")\n",
+    "    print(activity_counts.head(10))\n",
+    "\n",
+    "    # Show details of the Activity ID with the most occurrences\n",
+    "    most_common_activity = activity_counts.index[0]\n",
+    "    print(f\"\\nDetails for the most common Activity ID ({most_common_activity}):\")\n",
+    "    print(grouped_data[grouped_data['Activity ID'] == most_common_activity])\n",
+    "else:\n",
+    "    print(\"\\nNo duplicate Activity IDs found in the grouped data.\")\n",
+    "\n",
+    "# Basic statistics of the grouped data\n",
+    "print(\"\\nSummary Statistics:\")\n",
+    "print(grouped_data.describe())\n",
+    "\n",
+    "# Check for any missing values\n",
+    "print(\"\\nMissing Values:\")\n",
+    "print(grouped_data.isnull().sum())"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": ".venv",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.12.1"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2
+}
 
-Columns:
-Activity ID
-OE Event ID
-Well Name
 
-Data Types:
-Activity ID    object
-OE Event ID    object
-Well Name      object
+--- File: raw_data\global_journal_operatingtime.csv ---
 
-First 5 rows:
-       Activity ID               OE Event ID                  Well Name
-0  A.1011289.01.01  A.1011289.01.01_4D2B22AE                 ​D-WI1 ST1
-1  A.1011289.01.01  A.1011289.01.01_4D2B22AE                     ​D-WI3
-2  A.1011289.01.01  A.1011289.01.01_4D2B22AE                 ​D-WP1 ST1
-3  A.1024839.07.01  A.1024839.07.01_2786BED2  665C-12  API 04-030-67518
-4  A.1024839.09.02  A.1024839.09.02_6E7BDACA              A20 - Slot 12
-
-Description:
-            Activity ID               OE Event ID Well Name
-count              7332                      7332      4654
-unique             1286                      2727      2642
-top     A.1033318.03.02  A.1033318.03.02_2C46ED8D   Well #2
-freq                351                       351        11
-
-
---- File: raw_data\apg_oeid_operating_time.csv ---
-
-Shape: (1752, 7)
+Shape: (10708, 9)
 
 Columns:
 Sl Geounit (Code)
+Job Group code
+Job Type code
 Activity ID
 Journal Ops Event ID
 Journal Activity
@@ -693,6 +760,8 @@ Journal Activity duration, hrs
 
 Data Types:
 Sl Geounit (Code)                 object
+Job Group code                    object
+Job Type code                     object
 Activity ID                       object
 Journal Ops Event ID              object
 Journal Activity                  object
@@ -701,22 +770,22 @@ Journal Activity end time         object
 Journal Activity duration, hrs     int64
 
 First 5 rows:
-  Sl Geounit (Code)      Activity ID      Journal Ops Event ID Journal Activity Journal Activity start time Journal Activity end time  Journal Activity duration, hrs
-0               APG  A.1001189.02.05  A.1001189.02.05_4A06585C   Operating time         2021-12-27 07:32:00       2021-12-29 05:32:00                              46
-1               APG  A.1001189.02.05  A.1001189.02.05_4B7829D5   Operating time         2021-12-26 19:49:00       2021-12-27 06:00:00                              10
-2               APG  A.1001189.02.05  A.1001189.02.05_AD4D3182   Operating time         2021-12-26 10:28:00       2021-12-26 17:48:00                               7
-3               APG  A.1001189.02.09  A.1001189.02.09_81424B4B   Operating time         2022-05-06 23:45:00       2022-05-08 01:30:00                              26
-4               APG  A.1001189.02.09  A.1001189.02.09_92A706BA   Operating time         2022-05-04 11:30:00       2022-05-06 20:35:00                              57
+  Sl Geounit (Code) Job Group code Job Type code      Activity ID      Journal Ops Event ID Journal Activity Journal Activity start time Journal Activity end time  Journal Activity duration, hrs
+0               ECP           WLES     ES-CH-Ops  A.1019129.02.03  A.1019129.02.03_A40173D2   Operating time         2021-12-01 00:00:00       2021-12-01 02:00:00                               2
+1               NAO           WLES     ES-CH-Ops  A.1006869.02.10  A.1006869.02.10_D8620E9E   Operating time         2021-12-01 02:00:00       2021-12-01 09:45:00                               8
+2               ECP           WLES     ES-CH-Ops  A.1019129.02.03  A.1019129.02.03_A40173D2   Operating time         2021-12-01 02:00:00       2021-12-01 02:30:00                               1
+3               ECP           WLES     ES-CH-Ops  A.1019129.02.03  A.1019129.02.03_A40173D2   Operating time         2021-12-01 02:30:00       2021-12-01 03:30:00                               1
+4               ECP           WLES     ES-CH-Ops  A.1019129.02.03  A.1019129.02.03_06D55A9A   Operating time         2021-12-01 03:30:00       2021-12-01 05:00:00                               2
 
 Description:
        Journal Activity duration, hrs
-count                     1752.000000
-mean                         8.034247
-std                         47.575027
+count                    10708.000000
+mean                         4.758312
+std                         18.537492
 min                          0.000000
-25%                          2.000000
-50%                          4.000000
-75%                          8.000000
+25%                          1.000000
+50%                          2.000000
+75%                          4.000000
 max                       1421.000000
 
 
@@ -784,7 +853,7 @@ max    7.270064e+06      4383.00000
 
 --- File: raw_data\global_tickets_wles_ops_data.csv ---
 
-Shape: (17913, 19)
+Shape: (2755, 19)
 
 Columns:
 Sl Geounit (Code)
@@ -829,22 +898,22 @@ Well Geometry                  object
 Field Ticket USD net value    float64
 
 First 5 rows:
-  Sl Geounit (Code) Country Name Job Group code Job Type code      Activity ID          Booking Status         Field Ticket ID Field Ticket Start Date Field Ticket End Date      Well Name Rig Name  Rig type    Well type Well Operating Environment              Billing Account Field Ticket Status Rig environment Well Geometry  Field Ticket USD net value
-0               BRZ       Brazil           WLES     ES-OH-Ops  A.1002789.17.01  Operationally Complete  1002789.O0Z32.D1D69F8C     2022-09-04 03:00:00   2022-09-26 02:59:00  8-BUZ-59D-RJS      NaN       NaN          NaN                        NaN                          NaN      SubmittedForSO             NaN           NaN                   521905.20
-1               BRZ       Brazil           WLES     ES-CH-Ops  A.1002789.17.01  Operationally Complete  1002789.O0Z33.F8B6CC9F     2022-09-04 03:00:00   2022-09-26 02:59:00  8-BUZ-59D-RJS      NaN       NaN          NaN                        NaN                          NaN      SubmittedForSO             NaN           NaN                    59777.42
-2               ABC        Chile           WLES     ES-OH-Ops  A.1003553.65.01  Operationally Complete  1003553.V2C43.3A74A599     2022-08-26 04:00:00   2022-09-26 02:59:00      RCG ZG-1D      NaN       NaN          NaN                        NaN                    ENAP S.A.      SubmittedForSO             NaN           NaN                     7828.94
-3               ABC    Argentina           WLES     ES-CH-Ops  A.1005110.35.01  Operationally Complete  1005110.X6F48.C0D4BAD4     2022-09-24 03:00:00   2022-09-26 02:59:00  YPF.SC.EG-956  SAI-246  LAND RIG  Development                       LAND  MACACHA GUEMES 515 C1106BKK      SubmittedForSO            LAND           NaN                    17700.57
-4               BRZ       Brazil           WLES     ES-OH-Ops  A.1035019.03.02  Operationally Complete   1035019.U0G4.C14D5511     2022-09-24 03:00:00   2022-09-26 02:59:00     MINA 11 CD  OIL 122  LAND RIG          NaN                        NaN                 BRASKEM S.A.      SubmittedForSO            LAND           NaN                    18316.96
+  Sl Geounit (Code) Country Name Job Group code Job Type code       Activity ID          Booking Status         Field Ticket ID Field Ticket Start Date Field Ticket End Date       Well Name         Rig Name  Rig type    Well type Well Operating Environment               Billing Account Field Ticket Status Rig environment  Well Geometry  Field Ticket USD net value
+0               ECP      Ecuador           WLES     ES-CH-Ops   A.1010585.10.01  Operationally Complete   1010585.4Z20.F076C085     2021-12-24 05:00:00   2021-12-26 04:59:00       AUCA-J271      SINOPEC-156  LAND RIG  Development                       LAND            SHAYA ECUADOR S.A.      SubmittedForSO            LAND  Low Deviation                    48612.34
+1               ECP     Colombia           WLES     ES-OH-Ops   A.1019129.01.19  Operationally Complete   1019129.0K26.EC5E7F52     2021-12-25 05:00:00   2021-12-26 04:59:00       CIRA 4618  Independence 50  LAND RIG  Development                       LAND  SIERRACOL ENERGY ANDINA, LLC      SubmittedForSO            LAND  Low Deviation                     8500.00
+2               ECP     Colombia           WLES     ES-CH-Ops  A.1007265.224.01  Operationally Complete  1007265.9N120.ACFA1EFF     2021-12-26 05:00:00   2021-12-27 04:59:00  RUBIALES 1983H      Braserv 886  LAND RIG  Development                       LAND                ECOPETROL S.A.      SubmittedForSO            LAND     Horizontal                    22000.00
+3               ECP      Ecuador           WLES     ES-OH-Ops   A.1007781.01.10  Operationally Complete    1007781.2F9.AE8B344A     2021-12-25 05:00:00   2021-12-27 04:59:00      PINDO-023D   Triboilgas-203  LAND RIG  Development                       LAND  CONSORCIO PETROSUD-PETRORIVA      SubmittedForSO            LAND  Low Deviation                     9000.00
+4               APG    Australia           WLES     ES-OH-Ops   A.1001639.07.06  Operationally Complete  1001639.4O245.2B0FB491     2021-12-26 13:00:00   2021-12-27 12:59:00       RM22-32-1              NaN       NaN          NaN                        NaN                    Santos Ltd      SubmittedForSO             NaN            NaN                     6312.41
 
 Description:
        Field Ticket USD net value
-count                1.791300e+04
-mean                 1.194899e+05
-std                  2.812131e+05
+count                2.755000e+03
+mean                 1.417999e+05
+std                  4.454379e+05
 min                  0.000000e+00
-25%                  1.500000e+04
-50%                  3.970162e+04
-75%                  1.086150e+05
+25%                  7.827790e+03
+50%                  3.292427e+04
+75%                  9.391427e+04
 max                  7.270064e+06
 
 
@@ -906,71 +975,102 @@ import os
 import argparse
 import pandas as pd
 
-def create_codebase_file(directories, output_file, extensions=None, ignore_dirs=None, ignore_files=None, exclude_data=False):
-    if extensions is None:
-        extensions = ['.py', '.ipynb', '.sql', '.md', '.csv', '.xlsx']  # Including data file types
-    if ignore_dirs is None:
-        ignore_dirs = ['.git', '.venv', '__pycache__']
-    if ignore_files is None:
-        ignore_files = ['.gitignore', '.DS_Store']
-    
-    if exclude_data:
-        extensions = [ext for ext in extensions if ext not in ['.csv', '.xlsx']]
-        ignore_dirs.extend(['raw_data', 'processed_data'])
 
-    with open(output_file, 'w', encoding='utf-8') as outfile:
+def create_codebase_file(
+    directories,
+    output_file,
+    extensions=None,
+    ignore_dirs=None,
+    ignore_files=None,
+    exclude_data=False,
+):
+    if extensions is None:
+        extensions = [
+            ".py",
+            ".ipynb",
+            ".sql",
+            ".md",
+            ".csv",
+            ".xlsx",
+        ]  # Including data file types
+    if ignore_dirs is None:
+        ignore_dirs = [".git", ".venv", "__pycache__"]
+    if ignore_files is None:
+        ignore_files = [".gitignore", ".DS_Store"]
+
+    if exclude_data:
+        extensions = [ext for ext in extensions if ext not in [".csv", ".xlsx"]]
+        ignore_dirs.extend(["raw_data", "processed_data"])
+
+    with open(output_file, "w", encoding="utf-8") as outfile:
         for directory in directories:
             for dirpath, dirnames, filenames in os.walk(directory):
                 # Skip ignored directories
                 dirnames[:] = [d for d in dirnames if d not in ignore_dirs]
-                
+
                 for filename in filenames:
                     if filename in ignore_files:
                         continue
-                    
+
                     if not any(filename.endswith(ext) for ext in extensions):
                         continue
-                    
+
                     filepath = os.path.join(dirpath, filename)
                     relative_path = os.path.relpath(filepath, directory)
-                    
+
                     outfile.write(f"\n\n--- File: {relative_path} ---\n\n")
-                    
-                    if filename.endswith(('.csv', '.xlsx')):
+
+                    if filename.endswith((".csv", ".xlsx")):
                         outfile.write(summarize_data_file(filepath))
                     else:
                         try:
-                            with open(filepath, 'r', encoding='utf-8') as infile:
+                            with open(filepath, "r", encoding="utf-8") as infile:
                                 outfile.write(infile.read())
                         except UnicodeDecodeError:
                             outfile.write(f"[Binary file: {relative_path}]\n")
 
+
 def summarize_data_file(filepath):
     try:
-        if filepath.endswith('.csv'):
+        if filepath.endswith(".csv"):
             df = pd.read_csv(filepath)
-        elif filepath.endswith('.xlsx'):
+        elif filepath.endswith(".xlsx"):
             df = pd.read_excel(filepath)
-        
+
         summary = f"Shape: {df.shape}\n\n"
         summary += "Columns:\n" + "\n".join(df.columns) + "\n\n"
         summary += "Data Types:\n" + df.dtypes.to_string() + "\n\n"
         summary += "First 5 rows:\n" + df.head().to_string() + "\n\n"
         summary += "Description:\n" + df.describe().to_string() + "\n"
-        
+
         return summary
     except Exception as e:
         return f"Error summarizing file: {str(e)}\n"
 
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Create a summary file of the codebase including data files.")
-    parser.add_argument('--dirs', nargs='+', default=['.'], help='Directories to process (default: current directory)')
-    parser.add_argument('--output', default='project_codebase_summary.txt', help='Output file path')
-    parser.add_argument('--exclude-data', action='store_true', help='Exclude data files (.csv, .xlsx) from the summary')
+    parser = argparse.ArgumentParser(
+        description="Create a summary file of the codebase including data files."
+    )
+    parser.add_argument(
+        "--dirs",
+        nargs="+",
+        default=["."],
+        help="Directories to process (default: current directory)",
+    )
+    parser.add_argument(
+        "--output", default="project_codebase_summary.txt", help="Output file path"
+    )
+    parser.add_argument(
+        "--exclude-data",
+        action="store_true",
+        help="Exclude data files (.csv, .xlsx) from the summary",
+    )
     args = parser.parse_args()
 
     create_codebase_file(args.dirs, args.output, exclude_data=args.exclude_data)
     print(f"Codebase summary created at: {args.output}")
+
 
 --- File: utils\revenue_data_preprocessing.py ---
 
@@ -978,52 +1078,57 @@ if __name__ == "__main__":
 
 import pandas as pd
 
+
 def preprocess_tickets_data(df):
     """
     Preprocess the tickets data.
-    
+
     Args:
     df (pd.DataFrame): Raw tickets dataframe
-    
+
     Returns:
     pd.DataFrame: Preprocessed tickets dataframe
     """
     df = df.copy()
-    df['Field Ticket Start Date'] = pd.to_datetime(df['Field Ticket Start Date'])
-    df['Field Ticket End Date'] = pd.to_datetime(df['Field Ticket End Date'])
-    df['Adjusted Date'] = df['Field Ticket End Date'].apply(adjust_month)
+    df["Field Ticket Start Date"] = pd.to_datetime(df["Field Ticket Start Date"])
+    df["Field Ticket End Date"] = pd.to_datetime(df["Field Ticket End Date"])
+    df["Adjusted Date"] = df["Field Ticket End Date"].apply(adjust_month)
     return df
+
 
 def preprocess_rpe_data(df):
     """
     Preprocess the RPE revenue data.
     Filters the data to include only WLES (Wireline Services) business line
     and Service Revenue GL Account Category.
-    
+
     Args:
     df (pd.DataFrame): Raw RPE revenue dataframe
-    
+
     Returns:
     pd.DataFrame: Preprocessed RPE revenue dataframe for WLES and Service Revenue only
     """
     df = df.copy()
-    df['Month Date'] = pd.to_datetime(df['Month Date'])
-    
+    df["Month Date"] = pd.to_datetime(df["Month Date"])
+
     # Filter for WLES business line and Service Revenue GL Account Category
-    df_filtered = df[(df['SL Sub Business Line (Code)'] == 'WLES') & 
-                     (df['GL Account Category'] == 'Service Revenue')]
-    
+    df_filtered = df[
+        (df["SL Sub Business Line (Code)"] == "WLES")
+        & (df["GL Account Category"] == "Service Revenue")
+    ]
+
     return df_filtered
+
 
 def adjust_month(date):
     """
     Adjust the month based on the specified criteria.
     Dates from the 26th onwards fall under the subsequent month.
     This function is used only for tickets data.
-    
+
     Args:
     date (pd.Timestamp): Date to adjust
-    
+
     Returns:
     pd.Timestamp: Adjusted date
     """
