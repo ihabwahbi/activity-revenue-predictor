@@ -1,5 +1,3 @@
-# scripts/process_tickets_data.py
-
 import pandas as pd
 import sys
 from pathlib import Path
@@ -48,13 +46,14 @@ def preprocess_tickets_data(df):
 def merge_and_distribute_operating_days(tickets_df, journal_df):
     """
     Merge tickets data with journal data and distribute Operating Days.
+    Also calculate Operating_CellMonth based on the number of days in each month.
 
     Args:
     tickets_df (pd.DataFrame): Preprocessed tickets dataframe
     journal_df (pd.DataFrame): Processed journal dataframe
 
     Returns:
-    pd.DataFrame: Merged dataframe with distributed Operating Days
+    pd.DataFrame: Merged dataframe with distributed Operating Days and Operating_CellMonth
     """
     # Merge tickets data with journal data
     merged_df = pd.merge(
@@ -77,8 +76,16 @@ def merge_and_distribute_operating_days(tickets_df, journal_df):
         merged_df["Operating Days"] / merged_df["Ticket_Count"]
     )
 
-    # Drop the temporary Ticket_Count column
-    merged_df = merged_df.drop(columns=["Ticket_Count"])
+    # Calculate the number of days in the month for each ticket
+    merged_df["Days_in_Month"] = merged_df["Adjusted Date"].dt.daysinmonth
+
+    # Calculate Operating_CellMonth
+    merged_df["Operating_CellMonth"] = (
+        merged_df["Operating Days"] / merged_df["Days_in_Month"]
+    )
+
+    # Drop the temporary columns
+    merged_df = merged_df.drop(columns=["Ticket_Count", "Days_in_Month"])
 
     return merged_df
 
@@ -105,7 +112,7 @@ def process_tickets_data():
     # Load processed journal data
     journal_df = pd.read_csv(processed_journal_path)
 
-    # Merge and distribute Operating Days
+    # Merge and distribute Operating Days, and calculate Operating_CellMonth
     final_df = merge_and_distribute_operating_days(processed_tickets_df, journal_df)
 
     # Save the processed data
