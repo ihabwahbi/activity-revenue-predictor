@@ -1116,6 +1116,249 @@ ihab.a.wahbi@gmail.com
 }
 
 
+--- File: notebooks\07_generate_ml_model.ipynb ---
+
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# %% [markdown]\n",
+    "# # Generate Machine Learning Model for Ticket Revenue Prediction\n",
+    "# \n",
+    "# This notebook uses the processed ticket data to train a CatBoost model for predicting ticket revenue.\n",
+    "\n",
+    "# %%\n",
+    "import pandas as pd\n",
+    "import numpy as np\n",
+    "from catboost import CatBoostRegressor, Pool\n",
+    "from sklearn.metrics import mean_squared_error\n",
+    "import matplotlib.pyplot as plt\n",
+    "import sys\n",
+    "from pathlib import Path\n",
+    "\n",
+    "# Add the project root to the Python path\n",
+    "project_root = Path.cwd().parent\n",
+    "sys.path.append(str(project_root))\n",
+    "\n",
+    "# Set up matplotlib for inline plotting\n",
+    "%matplotlib inline\n",
+    "\n",
+    "# %% [markdown]\n",
+    "# ## Load and Preprocess Data\n",
+    "\n",
+    "# %%\n",
+    "def load_and_preprocess_data(file_path):\n",
+    "    df = pd.read_csv(file_path)\n",
+    "    df['Adjusted Date'] = pd.to_datetime(df['Adjusted Date'])\n",
+    "    df = df.sort_values('Adjusted Date')\n",
+    "    \n",
+    "    categorical_features = ['Country Name', 'Billing Account', 'Rig Name', 'Well type']\n",
+    "    df[categorical_features] = df[categorical_features].fillna('Unknown')\n",
+    "    \n",
+    "    train_df = df[(df['Adjusted Date'] >= '2022-10-01') & (df['Adjusted Date'] <= '2023-12-31')]\n",
+    "    test_df = df[(df['Adjusted Date'] >= '2024-01-01') & (df['Adjusted Date'] <= '2024-06-30')]\n",
+    "    \n",
+    "    return train_df, test_df, categorical_features\n",
+    "\n",
+    "file_path = project_root / \"processed_data\" / \"processed_tickets_wles_ops_data.csv\"\n",
+    "train_df, test_df, categorical_features = load_and_preprocess_data(file_path)\n",
+    "\n",
+    "print(\"Train set shape:\", train_df.shape)\n",
+    "print(\"Test set shape:\", test_df.shape)\n",
+    "print(\"Categorical features:\", categorical_features)\n",
+    "\n",
+    "# %% [markdown]\n",
+    "# ## Train Model with Best Parameters\n",
+    "\n",
+    "# %%\n",
+    "def train_best_model(train_df, test_df, categorical_features):\n",
+    "    X_train = train_df[categorical_features + ['Unique_Well_Count']]\n",
+    "    y_train = train_df['Tickets_Revenue']\n",
+    "    X_test = test_df[categorical_features + ['Unique_Well_Count']]\n",
+    "    y_test = test_df['Tickets_Revenue']\n",
+    "\n",
+    "    best_params = {\n",
+    "        'iterations': 383,\n",
+    "        'learning_rate': 0.05332604907347196,\n",
+    "        'depth': 5,\n",
+    "        'l2_leaf_reg': 2.523755213829783e-06,\n",
+    "        'bootstrap_type': 'Bernoulli',\n",
+    "        'subsample': 0.8737198107504663,\n",
+    "        'cat_features': categorical_features\n",
+    "    }\n",
+    "\n",
+    "    model = CatBoostRegressor(**best_params)\n",
+    "    model.fit(X_train, y_train, eval_set=(X_test, y_test), early_stopping_rounds=30, verbose=100)\n",
+    "\n",
+    "    train_preds = model.predict(X_train)\n",
+    "    test_preds = model.predict(X_test)\n",
+    "\n",
+    "    return model, train_preds, test_preds\n",
+    "\n",
+    "model, train_preds, test_preds = train_best_model(train_df, test_df, categorical_features)\n",
+    "\n",
+    "print(\"Train RMSE:\", np.sqrt(mean_squared_error(train_df['Tickets_Revenue'], train_preds)))\n",
+    "print(\"Test RMSE:\", np.sqrt(mean_squared_error(test_df['Tickets_Revenue'], test_preds)))\n",
+    "\n",
+    "# %% [markdown]\n",
+    "# ## Create Revenue Plots\n",
+    "\n",
+    "# %%\n",
+    "def create_revenue_plots(train_df, test_df, train_preds, test_preds):\n",
+    "    # Add 'Quarter' and 'Month' columns to both dataframes\n",
+    "    train_df['Quarter'] = train_df['Adjusted Date'].dt.to_period('Q')\n",
+    "    test_df['Quarter'] = test_df['Adjusted Date'].dt.to_period('Q')\n",
+    "    train_df['Month'] = train_df['Adjusted Date'].dt.to_period('M')\n",
+    "    test_df['Month'] = test_df['Adjusted Date'].dt.to_period('M')\n",
+    "\n",
+    "    train_df['Predicted'] = train_preds\n",
+    "    test_df['Predicted'] = test_preds\n",
+    "\n",
+    "    full_df = pd.concat([train_df, test_df])\n",
+    "\n",
+    "    # Function to plot for both quarterly and monthly data\n",
+    "    def plot_data(data, time_period, ax, geounit=None):\n",
+    "        title_suffix = f' - {geounit}' if geounit else ''\n",
+    "        data['TimePeriod_str'] = data[time_period].astype(str)\n",
+    "        \n",
+    "        ax.plot(data['TimePeriod_str'], data['Tickets_Revenue'], label='Actual', marker='o', color='blue')\n",
+    "        \n",
+    "        train_periods = train_df[time_period].unique()\n",
+    "        test_periods = test_df[time_period].unique()\n",
+    "        \n",
+    "        train_plot = data[data[time_period].isin(train_periods)]\n",
+    "        test_plot = data[data[time_period].isin(test_periods)]\n",
+    "        \n",
+    "        ax.plot(train_plot['TimePeriod_str'], \n",
+    "                train_plot['Predicted'], \n",
+    "                label='Predicted (Train)', marker='s', color='orange')\n",
+    "        \n",
+    "        test_color = 'green'\n",
+    "        test_line_style = ':'\n",
+    "        \n",
+    "        ax.plot(test_plot['TimePeriod_str'], \n",
+    "                test_plot['Predicted'], \n",
+    "                label='Predicted (Test)', marker='s', color=test_color, linestyle=test_line_style)\n",
+    "\n",
+    "        # Add dotted line connecting last train prediction to test predictions\n",
+    "        if not train_plot.empty and not test_plot.empty:\n",
+    "            last_train_period = train_periods[-1]\n",
+    "            first_test_period = test_periods[0]\n",
+    "            \n",
+    "            last_train_pred = train_plot[train_plot[time_period] == last_train_period]['Predicted'].values[0]\n",
+    "            first_test_pred = test_plot[test_plot[time_period] == first_test_period]['Predicted'].values[0]\n",
+    "            \n",
+    "            connecting_periods = [last_train_period, first_test_period]\n",
+    "            connecting_predictions = [last_train_pred, first_test_pred]\n",
+    "            \n",
+    "            ax.plot([p.strftime('%Y-%m' if time_period == 'Month' else '%YQ%q') for p in connecting_periods], \n",
+    "                    connecting_predictions, \n",
+    "                    linestyle=test_line_style, color=test_color)\n",
+    "\n",
+    "        ax.set_title(f'Actual vs Predicted Revenue by {time_period}{title_suffix}')\n",
+    "        ax.set_xlabel(time_period)\n",
+    "        ax.set_ylabel('Revenue')\n",
+    "        ax.legend()\n",
+    "        ax.tick_params(axis='x', rotation=45)\n",
+    "\n",
+    "    # Plot for each geounit\n",
+    "    geounits = full_df['Sl Geounit (Code)'].unique()\n",
+    "    for geounit in geounits:\n",
+    "        geounit_df = full_df[full_df['Sl Geounit (Code)'] == geounit]\n",
+    "        \n",
+    "        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 12))\n",
+    "\n",
+    "        # Plot quarterly data\n",
+    "        quarterly_data = geounit_df.groupby(['Quarter', 'Sl Geounit (Code)']).agg({\n",
+    "            'Tickets_Revenue': 'sum',\n",
+    "            'Predicted': 'sum'\n",
+    "        }).reset_index()\n",
+    "        plot_data(quarterly_data, 'Quarter', ax1, geounit)\n",
+    "\n",
+    "        # Plot monthly data\n",
+    "        monthly_data = geounit_df.groupby(['Month', 'Sl Geounit (Code)']).agg({\n",
+    "            'Tickets_Revenue': 'sum',\n",
+    "            'Predicted': 'sum'\n",
+    "        }).reset_index()\n",
+    "        plot_data(monthly_data, 'Month', ax2, geounit)\n",
+    "\n",
+    "        plt.tight_layout()\n",
+    "        plt.show()\n",
+    "\n",
+    "    # Plot overall data (all geounits combined)\n",
+    "    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 12))\n",
+    "\n",
+    "    # Plot quarterly data\n",
+    "    quarterly_data = full_df.groupby('Quarter').agg({\n",
+    "        'Tickets_Revenue': 'sum',\n",
+    "        'Predicted': 'sum'\n",
+    "    }).reset_index()\n",
+    "    plot_data(quarterly_data, 'Quarter', ax1, 'All Geounits')\n",
+    "\n",
+    "    # Plot monthly data\n",
+    "    monthly_data = full_df.groupby('Month').agg({\n",
+    "        'Tickets_Revenue': 'sum',\n",
+    "        'Predicted': 'sum'\n",
+    "    }).reset_index()\n",
+    "    plot_data(monthly_data, 'Month', ax2, 'All Geounits')\n",
+    "\n",
+    "    plt.tight_layout()\n",
+    "    plt.show()\n",
+    "\n",
+    "# Call the function\n",
+    "create_revenue_plots(train_df, test_df, train_preds, test_preds)\n",
+    "\n",
+    "# %% [markdown]\n",
+    "# ## Model Feature Importance\n",
+    "\n",
+    "# %%\n",
+    "feature_importance = model.feature_importances_\n",
+    "feature_names = categorical_features + ['Unique_Well_Count']\n",
+    "\n",
+    "feature_importance_df = pd.DataFrame({'feature': feature_names, 'importance': feature_importance})\n",
+    "feature_importance_df = feature_importance_df.sort_values('importance', ascending=False)\n",
+    "\n",
+    "plt.figure(figsize=(10, 6))\n",
+    "plt.bar(feature_importance_df['feature'], feature_importance_df['importance'])\n",
+    "plt.title('Feature Importance')\n",
+    "plt.xlabel('Features')\n",
+    "plt.ylabel('Importance')\n",
+    "plt.xticks(rotation=45, ha='right')\n",
+    "plt.tight_layout()\n",
+    "plt.show()\n",
+    "\n",
+    "print(feature_importance_df)"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": ".venv",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.12.1"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2
+}
+
+
 --- File: processed_data\processed_journal_operatingtime.csv ---
 
 Shape: (1619, 5)
@@ -1156,74 +1399,60 @@ max      64.000000
 
 --- File: processed_data\processed_tickets_wles_ops_data.csv ---
 
-Shape: (2755, 22)
+Shape: (1139, 15)
 
 Columns:
+Adjusted Date
 Sl Geounit (Code)
 Country Name
 Job Group code
 Job Type code
-Activity ID
-Booking Status
-Field Ticket ID
-Field Ticket Start Date
-Field Ticket End Date
-Well Name
+Billing Account
 Rig Name
 Rig type
+Rig environment
 Well type
 Well Operating Environment
-Billing Account
-Field Ticket Status
-Rig environment
-Well Geometry
-Field Ticket USD net value
-Adjusted Date
+Unique_Well_Count
+Tickets_Revenue
 Operating Days
 Operating_CellMonth
 
 Data Types:
+Adjusted Date                  object
 Sl Geounit (Code)              object
 Country Name                   object
 Job Group code                 object
 Job Type code                  object
-Activity ID                    object
-Booking Status                 object
-Field Ticket ID                object
-Field Ticket Start Date        object
-Field Ticket End Date          object
-Well Name                      object
+Billing Account                object
 Rig Name                       object
 Rig type                       object
+Rig environment                object
 Well type                      object
 Well Operating Environment     object
-Billing Account                object
-Field Ticket Status            object
-Rig environment                object
-Well Geometry                  object
-Field Ticket USD net value    float64
-Adjusted Date                  object
+Unique_Well_Count               int64
+Tickets_Revenue               float64
 Operating Days                float64
 Operating_CellMonth           float64
 
 First 5 rows:
-  Sl Geounit (Code) Country Name Job Group code Job Type code       Activity ID          Booking Status         Field Ticket ID Field Ticket Start Date Field Ticket End Date       Well Name         Rig Name  Rig type    Well type Well Operating Environment               Billing Account Field Ticket Status Rig environment  Well Geometry  Field Ticket USD net value        Adjusted Date  Operating Days  Operating_CellMonth
-0               ECP      Ecuador           WLES     ES-CH-Ops   A.1010585.10.01  Operationally Complete   1010585.4Z20.F076C085     2021-12-24 05:00:00   2021-12-26 04:59:00       AUCA-J271      SINOPEC-156  LAND RIG  Development                       LAND            SHAYA ECUADOR S.A.      SubmittedForSO            LAND  Low Deviation                    48612.34  2022-01-01 04:59:00        1.000000             0.032258
-1               ECP     Colombia           WLES     ES-OH-Ops   A.1019129.01.19  Operationally Complete   1019129.0K26.EC5E7F52     2021-12-25 05:00:00   2021-12-26 04:59:00       CIRA 4618  Independence 50  LAND RIG  Development                       LAND  SIERRACOL ENERGY ANDINA, LLC      SubmittedForSO            LAND  Low Deviation                     8500.00  2022-01-01 04:59:00        1.000000             0.032258
-2               ECP     Colombia           WLES     ES-CH-Ops  A.1007265.224.01  Operationally Complete  1007265.9N120.ACFA1EFF     2021-12-26 05:00:00   2021-12-27 04:59:00  RUBIALES 1983H      Braserv 886  LAND RIG  Development                       LAND                ECOPETROL S.A.      SubmittedForSO            LAND     Horizontal                    22000.00  2022-01-01 04:59:00        1.285714             0.041475
-3               ECP      Ecuador           WLES     ES-OH-Ops   A.1007781.01.10  Operationally Complete    1007781.2F9.AE8B344A     2021-12-25 05:00:00   2021-12-27 04:59:00      PINDO-023D   Triboilgas-203  LAND RIG  Development                       LAND  CONSORCIO PETROSUD-PETRORIVA      SubmittedForSO            LAND  Low Deviation                     9000.00  2022-01-01 04:59:00             NaN                  NaN
-4               APG    Australia           WLES     ES-OH-Ops   A.1001639.07.06  Operationally Complete  1001639.4O245.2B0FB491     2021-12-26 13:00:00   2021-12-27 12:59:00       RM22-32-1              NaN       NaN          NaN                        NaN                    Santos Ltd      SubmittedForSO             NaN            NaN                     6312.41  2022-01-01 12:59:00        7.000000             0.225806
+         Adjusted Date Sl Geounit (Code) Country Name Job Group code Job Type code                        Billing Account                        Rig Name  Rig type Rig environment    Well type Well Operating Environment  Unique_Well_Count  Tickets_Revenue  Operating Days  Operating_CellMonth
+0  2022-01-01 04:59:00               ECP     Colombia           WLES     ES-CH-Ops                      CNE OIL & GAS SAS                      PIONEER 53  LAND RIG            LAND  Development                       LAND                  1         29312.30        2.000000             0.064516
+1  2022-01-01 04:59:00               ECP     Colombia           WLES     ES-CH-Ops                    DRUMMOND ENERGY INC  NAM RIGLESS - FOR RIGLESS WORK  LAND RIG            LAND  Exploration                       LAND                  1         15050.70        1.000000             0.032258
+2  2022-01-01 04:59:00               ECP     Colombia           WLES     ES-CH-Ops                         ECOPETROL S.A.                     Braserv 886  LAND RIG            LAND  Development                       LAND                  6        132000.00        7.714286             0.248848
+3  2022-01-01 04:59:00               ECP     Colombia           WLES     ES-CH-Ops                GEOPARK COLOMBIA S.A.S.               Top Drilling 1501  LAND RIG            LAND  Development                       LAND                  1        113309.62        2.000000             0.064516
+4  2022-01-01 04:59:00               ECP     Colombia           WLES     ES-CH-Ops  PAREX RESOURCES COLOMBIA LTD SUCURSAL               Top Drilling 2502  LAND RIG            LAND  Development                       LAND                  1         63052.53        2.000000             0.064516
 
 Description:
-       Field Ticket USD net value  Operating Days  Operating_CellMonth
-count                2.755000e+03     2688.000000          2688.000000
-mean                 1.417999e+05        1.725074             0.056766
-std                  4.454379e+05        1.664126             0.055134
-min                  0.000000e+00        0.300000             0.009677
-25%                  7.827790e+03        1.000000             0.032258
-50%                  3.292427e+04        1.111111             0.036667
-75%                  9.391427e+04        2.000000             0.064516
-max                  7.270064e+06       24.000000             0.774194
+       Unique_Well_Count  Tickets_Revenue  Operating Days  Operating_CellMonth
+count        1139.000000     1.139000e+03     1139.000000          1139.000000
+mean            1.509219     2.718344e+05        3.184339             0.104811
+std             1.596529     6.593972e+05        3.227639             0.106801
+min             1.000000     0.000000e+00        0.000000             0.000000
+25%             1.000000     3.519928e+04        1.000000             0.035714
+50%             1.000000     8.736875e+04        2.000000             0.066667
+75%             1.000000     2.032528e+05        4.000000             0.129032
+max            13.000000     7.406547e+06       32.000000             1.142857
 
 
 --- File: raw_data\global_cellmonth_wles_ops_data.csv ---
@@ -1597,25 +1826,13 @@ if __name__ == "__main__":
 --- File: scripts\tickets_data_processor.py ---
 
 import pandas as pd
-import sys
 from pathlib import Path
-
-# Add the project root to the Python path
-project_root = Path(__file__).resolve().parents[1]
-sys.path.append(str(project_root))
 
 
 def adjust_month(date):
     """
     Adjust the month based on the specified criteria.
     Dates from the 26th onwards fall under the subsequent month.
-    This function is used only for tickets data.
-
-    Args:
-    date (pd.Timestamp): Date to adjust
-
-    Returns:
-    pd.Timestamp: Adjusted date
     """
     if date.day <= 25:
         return date.replace(day=1)
@@ -1627,12 +1844,6 @@ def adjust_month(date):
 def preprocess_tickets_data(df):
     """
     Preprocess the tickets data.
-
-    Args:
-    df (pd.DataFrame): Raw tickets dataframe
-
-    Returns:
-    pd.DataFrame: Preprocessed tickets dataframe
     """
     df = df.copy()
     df["Field Ticket Start Date"] = pd.to_datetime(df["Field Ticket Start Date"])
@@ -1645,13 +1856,6 @@ def merge_and_distribute_operating_days(tickets_df, journal_df):
     """
     Merge tickets data with journal data and distribute Operating Days.
     Also calculate Operating_CellMonth based on the number of days in each month.
-
-    Args:
-    tickets_df (pd.DataFrame): Preprocessed tickets dataframe
-    journal_df (pd.DataFrame): Processed journal dataframe
-
-    Returns:
-    pd.DataFrame: Merged dataframe with distributed Operating Days and Operating_CellMonth
     """
     # Merge tickets data with journal data
     merged_df = pd.merge(
@@ -1688,11 +1892,54 @@ def merge_and_distribute_operating_days(tickets_df, journal_df):
     return merged_df
 
 
+def group_and_aggregate_tickets_data(df):
+    """
+    Group and aggregate the tickets data based on specified columns.
+    """
+    grouped_df = (
+        df.groupby(
+            [
+                "Adjusted Date",
+                "Sl Geounit (Code)",
+                "Country Name",
+                "Job Group code",
+                "Job Type code",
+                "Billing Account",
+                "Rig Name",
+                "Rig type",
+                "Rig environment",
+                "Well type",
+                "Well Operating Environment",
+            ]
+        )
+        .agg(
+            {
+                "Well Name": "nunique",
+                "Field Ticket USD net value": "sum",
+                "Operating Days": "sum",
+                "Operating_CellMonth": "sum",
+            }
+        )
+        .reset_index()
+    )
+
+    # Rename columns
+    grouped_df = grouped_df.rename(
+        columns={
+            "Well Name": "Unique_Well_Count",
+            "Field Ticket USD net value": "Tickets_Revenue",
+        }
+    )
+
+    return grouped_df
+
+
 def process_tickets_data():
     """
-    Process tickets data, merge with journal data, and save the result.
+    Process tickets data, merge with journal data, group and aggregate, and save the result.
     """
     # Define file paths
+    project_root = Path(__file__).resolve().parents[1]
     raw_tickets_path = project_root / "raw_data" / "global_tickets_wles_ops_data.csv"
     processed_journal_path = (
         project_root / "processed_data" / "processed_journal_operatingtime.csv"
@@ -1711,7 +1958,10 @@ def process_tickets_data():
     journal_df = pd.read_csv(processed_journal_path)
 
     # Merge and distribute Operating Days, and calculate Operating_CellMonth
-    final_df = merge_and_distribute_operating_days(processed_tickets_df, journal_df)
+    merged_df = merge_and_distribute_operating_days(processed_tickets_df, journal_df)
+
+    # Group and aggregate the data
+    final_df = group_and_aggregate_tickets_data(merged_df)
 
     # Save the processed data
     final_df.to_csv(output_path, index=False)
